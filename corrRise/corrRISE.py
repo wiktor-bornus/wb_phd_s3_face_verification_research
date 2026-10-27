@@ -6,6 +6,7 @@ from facenet_pytorch.models.mtcnn import MTCNN
 from matplotlib import pyplot as plt
 
 from corrRise.mask_generator import generate_mask_set
+from utils import get_random_face_path
 
 
 def cosine_similarity(embedding_a, embedding_b):
@@ -200,9 +201,39 @@ def corrRISE(
         "negative_b": negative_b,
     }
 
+import numpy as np
+from scipy.ndimage import gaussian_filter
+
+
+def smooth_saliency_map(
+    saliency_map: np.ndarray,
+    sigma: float = 2.0
+) -> np.ndarray:
+    """
+    Smooth a CorrRISE saliency map using a Gaussian filter.
+
+    Parameters
+    ----------
+    saliency_map : np.ndarray
+        Saliency map of shape (H, W).
+    sigma : float
+        Gaussian smoothing strength. Larger values produce smoother maps.
+
+    Returns
+    -------
+    np.ndarray
+        Smoothed saliency map.
+    """
+    if sigma < 0:
+        raise ValueError("sigma must be non-negative.")
+
+    return gaussian_filter(
+        saliency_map.astype(np.float32),
+        sigma=sigma
+    )
+
 def import_and_process_image(path, mtcnn):
     img = Image.open(path)
-    print(img.size)
     face = np.array(mtcnn(img))
     face = np.moveaxis(face, 0, -1)
     return face
@@ -230,8 +261,12 @@ if __name__ == "__main__":
     mtcnn = MTCNN(image_size=160, thresholds=[0.9, 0.9, 0.9], device=torch.device("cuda"))
     extractor = InceptionResnetV1(pretrained="vggface2", device=torch.device("cuda")).eval()
 
-    face_1_path = "/home/wiktor/Doktorat/repositories/mavceleb_baseline/dataset/mavceleb_v1_train/faces/id0002/English/a8YwLpyHArc/0000100.jpg"
-    face_2_path = "/home/wiktor/Doktorat/repositories/mavceleb_baseline/dataset/mavceleb_v1_train/faces/id0001/English/HpzYIwAaNlE/0001225.jpg"
+
+    id_1 = "id0012"
+    id_2 = "id0011"
+
+    face_1_path = get_random_face_path(id_1)
+    face_2_path = get_random_face_path(id_2)
 
     image_a = import_and_process_image(face_1_path, mtcnn)
     image_b = import_and_process_image(face_2_path, mtcnn)
@@ -241,12 +276,12 @@ if __name__ == "__main__":
     # plt.show()
 
 
-    N = 1000
+    N = 500
 
     masks = generate_mask_set(
         height=image_a.shape[0],
         width=image_a.shape[1],
-        patch_size=16,
+        patch_size=30,
         num_patches=10,
         num_masks=N,
         seed=42
@@ -274,7 +309,7 @@ if __name__ == "__main__":
 
     axes[0, 0].imshow(image_a_display)
     im1 = axes[0, 0].imshow(
-        results["positive_a"],
+        smooth_saliency_map(results["positive_a"]),
         cmap="jet",
         alpha=alpha
     )
@@ -285,7 +320,7 @@ if __name__ == "__main__":
 
     axes[0, 1].imshow(image_a_display)
     im2 = axes[0, 1].imshow(
-        np.abs(results["negative_a"]),
+        smooth_saliency_map(np.abs(results["negative_a"])),
         cmap="jet",
         alpha=alpha
     )
@@ -295,7 +330,7 @@ if __name__ == "__main__":
 
     axes[1, 0].imshow(image_b_display)
     im3 = axes[1, 0].imshow(
-        results["positive_b"],
+        smooth_saliency_map(results["positive_b"]),
         cmap="jet",
         alpha=alpha
     )
@@ -306,7 +341,7 @@ if __name__ == "__main__":
 
     axes[1, 1].imshow(image_b_display)
     im4 = axes[1, 1].imshow(
-        np.abs(results["negative_b"]),
+        smooth_saliency_map(np.abs(results["negative_b"])),
         cmap="jet",
         alpha=alpha
     )

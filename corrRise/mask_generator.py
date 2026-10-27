@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+import numpy as np
+
 def generate_random_mask(
     height: int,
     width: int,
@@ -10,7 +12,10 @@ def generate_random_mask(
     rng: np.random.Generator = None
 ) -> np.ndarray:
     """
-    Generate one CorrRISE-style random mask.
+    Generate one CorrRISE-style random mask with uniform noise patches.
+
+    Each square patch contains independently sampled random values
+    from a uniform distribution U(0, 1).
 
     Parameters
     ----------
@@ -29,8 +34,11 @@ def generate_random_mask(
     -------
     mask : np.ndarray
         Float32 array of shape (height, width), with values in [0, 1].
-        The background is 1.0, and each patch receives a random value.
+        The background is 1.0, and each patch contains uniform noise.
     """
+    if height <= 0 or width <= 0:
+        raise ValueError("Height and width must be positive.")
+
     if patch_size <= 0:
         raise ValueError("patch_size must be positive.")
 
@@ -48,18 +56,19 @@ def generate_random_mask(
 
     # Place square patches at random locations.
     for _ in range(num_patches):
-        # Sample the top-left corner of the patch.
         y = rng.integers(0, height - patch_size + 1)
         x = rng.integers(0, width - patch_size + 1)
 
-        # Sample a random patch value in [0, 1).
-        value = rng.random()
+        # Generate independent uniform random values for every pixel.
+        noise_patch = rng.random(
+            (patch_size, patch_size)
+        ).astype(np.float32)
 
-        # Assign the same value to every pixel in this square patch.
+        # Insert the noise patch into the mask.
         mask[
             y:y + patch_size,
             x:x + patch_size
-        ] = value
+        ] = noise_patch
 
     return mask
 
